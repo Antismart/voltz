@@ -2,6 +2,20 @@
   "name": "contracts",
   "version": "1.0.0",
   "type": "module",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "deploy": "hardhat ignition deploy ignition/modules/VoltzContracts.ts --network testnet",
+    "deploy:mainnet": "hardhat ignition deploy ignition/modules/VoltzContracts.ts --network mainnet",
+    "deploy:local": "hardhat ignition deploy ignition/modules/VoltzContracts.ts --network localhost",
+    "verify": "hardhat verify --network testnet",
+    "verify:mainnet": "hardhat verify --network mainnet",
+    "clean": "hardhat clean && rm -rf cache artifacts typechain-types"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.2.0",
+    "dotenv": "^16.4.7"
+  },
   "devDependencies": {
     "@nomicfoundation/hardhat-ignition": "^3.0.5",
     "@nomicfoundation/hardhat-toolbox-viem": "^5.0.1",

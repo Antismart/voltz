@@ -1,0 +1,201 @@
+// Voltz Backend Database Schema
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+// User account linked to wallet address
+model User {
+  id        String   @id @default(cuid())
+  address   String   @unique // Ethereum address
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Profile data (cached from contract)
+  profileTokenId Int?     @unique
+  profileType    String?  // developer, designer, founder, etc.
+  storageURI     String?  // 0G Storage URI
+  isActive       Boolean  @default(true)
+
+  // Relations
+  eventRegistrations EventRegistration[]
+  matches            Match[]
+  sessions           Session[]
+  attestations       Attestation[]
+  reputationScores   ReputationScore[]
+
+  @@index([address])
+  @@map("users")
+}
+
+// Cached event data
+model Event {
+  id          String   @id @default(cuid())
+  contractId  Int      @unique // On-chain event ID
+  name        String
+  description String
+  location    String
+  startTime   DateTime
+  endTime     DateTime
+  organizer   String   // Ethereum address
+  maxAttendees Int?
+  metadataURI String   // 0G Storage URI
+
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  registrations EventRegistration[]
+  matches       Match[]
+
+  @@index([contractId])
+  @@index([startTime])
+  @@map("events")
+}
+
+// Event registrations (cached from contract)
+model EventRegistration {
+  id           String   @id @default(cuid())
+  userId       String
+  eventId      String
+  goals        String   // User's goals for the event
+  registeredAt DateTime @default(now())
+  checkedIn    Boolean  @default(false)
+  checkedInAt  DateTime?
+
+  // Relations
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, eventId])
+  @@index([eventId])
+  @@index([userId])
+  @@map("event_registrations")
+}
+
+// AI-generated matches
+model Match {
+  id        String   @id @default(cuid())
+  eventId   String
+  userId    String   // User this match is for
+  matchedUserId String // User they matched with
+  score     Int      // Match score 0-100
+  reasoning String   // AI-generated reasoning
+  proofURI  String?  // 0G DA proof URI
+
+  viewed    Boolean  @default(false)
+  contacted Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId, matchedUserId])
+  @@index([eventId, userId])
+  @@index([userId])
+  @@map("matches")
+}
+
+// Cached attestations
+model Attestation {
+  id             String   @id @default(cuid())
+  contractId     Int      @unique // On-chain attestation ID
+  userId         String
+  attestationType String  // GITHUB, TWITTER, LINKEDIN, CUSTOM
+  claim          String   // e.g., "100+ Solidity commits"
+  proofHash      String   @unique
+  proofURI       String   // 0G DA URI
+  verifier       String   // Ethereum address
+  expiresAt      DateTime?
+  revoked        Boolean  @default(false)
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([attestationType])
+  @@map("attestations")
+}
+
+// Cached reputation scores
+model ReputationScore {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+
+  totalScore              Int @default(0)
+  eventAttendance         Int @default(0)
+  qualityConnections      Int @default(0)
+  workshopParticipation   Int @default(0)
+  credentialVerifications Int @default(0)
+  communityFeedback       Int @default(0)
+
+  tier      String   @default("Newcomer") // Newcomer, Bronze, Silver, Gold, Platinum
+
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([totalScore])
+  @@map("reputation_scores")
+}
+
+// Session management (for Privy auth)
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+
+  createdAt DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+// Job queue tracking
+model Job {
+  id        String   @id @default(cuid())
+  type      String   // match-generation, reputation-update, etc.
+  data      Json     // Job-specific data
+  status    String   @default("pending") // pending, processing, completed, failed
+  result    Json?    // Job result
+  error     String?  // Error message if failed
+  attempts  Int      @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  completedAt DateTime?
+
+  @@index([type, status])
+  @@index([createdAt])
+  @@map("jobs")
+}
+
+// Analytics and metrics
+model Metric {
+  id        String   @id @default(cuid())
+  name      String   // metric name
+  value     Float    // metric value
+  metadata  Json?    // additional data
+  timestamp DateTime @default(now())
+
+  @@index([name, timestamp])
+  @@map("metrics")
+}
